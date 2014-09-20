@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+
+body {
+  margin: 0;
+  font-size: 10px;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+#graphContainer {
+
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: none;
+}
+
+#graphContainer .Coalition {
+  fill: #0066FF;  
+}
+
+#graphContainer .Labor {
+
+  fill:#cb0f32;
+}
+
+#graphContainer .Greens {
+
+  fill:#339933;
+
+}
+
+#graphContainer .Palmer_United {
+
+  fill:#FFFF00;
+}
+
+#graphContainer .Family_First {
+
+  fill:#CC0099;
+}
+
+#graphContainer .Motoring_Enthusiast {
+
+  fill:#996633;
+}
+
+#graphContainer .Xenophon {
+
+  fill:rgb(255, 88, 0);
+}
+
+#graphContainer .Madigan {
+
+  fill:#669999;
+}
+
+#graphContainer .Liberal_Democratic {
+
+  fill:#666699;
+}
+
+#voteTable .Coalition {
+  border-bottom: 2px solid #0066FF;  
+}
+
+#voteTable .Labor {
+
+  border-bottom: 2px solid #cb0f32;
+}
+
+#voteTable .Greens {
+
+  border-bottom: 2px solid #339933;
+
+}
+
+#voteTable .Palmer_United {
+
+  border-bottom: 2px solid #FFFF00;
+}
+
+#voteTable .Family_First {
+
+  border-bottom: 2px solid #CC0099;
+}
+
+#voteTable .Motoring_Enthusiast {
+
+  border-bottom: 2px solid #996633;
+}
+
+#voteTable .Xenophon {
+
+  border-bottom: 2px solid rgb(255, 88, 0);
+}
+
+#voteTable .Madigan {
+
+  border-bottom: 2px solid #669999;
+}
+
+#voteTable .Liberal_Democratic {
+
+  border-bottom: 2px solid #666699;
+}
+
+
+.container {
+  margin:5px;
+}
+
+#voteTable {
+  margin-right:5%;  
+  font-size: 12px;
+}
+
+.forCol {
+  text-align: center;
+}
+
+.againstCol {
+  text-align: center;
+}
+
+.absentCol {
+  text-align: center;
+}
+
+.partyCol {
+  text-align: left;
+}
+
+.large {
+
+  font-size:16px; 
+}
+
+h1 {
+  font-family: Georgia, Times, serif;
+  text-align: center;
+}
+
+.clearfix:after {
+   content: " "; /* Older browser do not support empty content */
+   visibility: hidden;
+   display: block;
+   height: 0;
+   clear: both;
+}
+
+</style>
+</head>
+<body>
+
+  <div class="container clearfix">
+    <h1>Votes: Introduce medicare co-payment</h1>
+    <div id="graphContainer">
+    </div>  
+    <div id="voteTableContainer">
+      <table id="voteTable">
+        
+      </table>  
+
+    </div>
+    <div class="spacer" style="height:20px;"></div>
+  </div>  
+
+
+<script src="d3.min.js"></script>
+<script src="jquery-1.11.1.min.js"></script>
+<script src="http://interactive.guim.co.uk/libs/iframe-messenger/iframeMessenger.js" type="text/javascript"></script>
+<script>
+
+//Get window width
+
+getW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+getH = 300;
+
+//Smaller graph for smaller screens
+
+if (getW < 460) {
+
+  getH = 200;
+
+}
+
+var margin = {top: 5, right: 20, bottom: 10, left:25},
+    width = getW - margin.left - margin.right,
+    height = getH - margin.top - margin.bottom;
+
+var x = d3.scale.ordinal()
+    .rangeRoundBands([0, width], .4);
+
+var y = d3.scale.linear()
+    .rangeRound([height, 0]);
+
+var color = d3.scale.ordinal()
+    .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left");
+
+var notes = [{"outcome":"Pass"},{"outcome":"Block"}];
+
+function drawGraph() {
+
+//Clear old graph if it exists
+
+d3.select("#voteGraph").remove();
+
+//Add graph
+
+var svg = d3.select("#graphContainer").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("id", "voteGraph")
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("id", "graphNode")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+d3.csv("copayment.csv", function(error, data) {
+
+  color.domain(d3.keys(data[0]).filter(function(key) { return key !== "Outcome"; }));
+
+  data.forEach(function(d) {
+    var y0 = 0;
+    d.parties = color.domain().map(function(name) { return {name: name, y0: y0, y1: y0 += +d[name]}; });
+    d.total = d.parties[d.parties.length - 1].y1;
+  });
+
+  //Get total number of senators present, excluding absentees
+
+  var totalPresent = 0;
+  var totalAbsent = 0;
+  var noToPass,noToBlock;
+
+  data.slice(0,2).forEach(function(d) {
+
+    console.log(d.total);
+    totalPresent = totalPresent + d.total;
+
+  });
+
+  //Number of absent senators
+
+  totalAbsent = 76 - totalPresent;
+
+  //Work out the number needed for a majority 
+
+  //First check if odd number
+
+  if ((totalPresent % 2) == 1) {
+
+      noToPass = Math.round(totalPresent/2);
+      noToBlock = noToPass - 1;
+  }
+
+  //Otherwise just divide by two
+
+  else {
+
+    noToPass = totalPresent/2 + 1;
+    noToBlock = totalPresent/2;
+
+  }
+
+  //noToPass = 39;
+  //noToBlock = 38;
+
+  //Get largest single total
+
+  var getMax;
+
+  if (d3.max(data, function(d) { return d.total; }) < 39) {
+
+    getMax = 40;
+  }
+
+  else {
+
+    getMax = d3.max(data, function(d) { return d.total; });
+  }
+
+  x.domain(data.map(function(d) { return d.Outcome; }));
+  y.domain([0, getMax]);
+
+  //Graph stuff
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis);
+
+  var state = svg.selectAll(".stackNodes")
+      .data(data)
+    .enter().append("g")
+      .attr("class", "g stackNodes")
+      .attr("transform", function(d) { return "translate(" + x(d.Outcome) + ",0)"; });
+
+  state.selectAll("rect")
+      .data(function(d) { return d.parties; })
+    .enter().append("rect")
+      .attr("class", function(d) {return d.name.replace(" ", "_")})
+      .attr("width", x.rangeBand())
+      .attr("y", function(d) { return y(d.y1); })
+      .attr("height", function(d) { return y(d.y0) - y(d.y1); });
+
+  //Add pass and block thresholds    
+
+  var toPass = svg.selectAll(".notes")
+    .data(data)
+    .enter().append("g")
+      .attr("class", "g notes")
+      .attr("transform", function(d) { return "translate(" + x(d.Outcome) + ",0)"; })
+
+  toPass
+    .append("text")
+      .data(notes)
+      .attr("y", function(d) { 
+
+        if (d.outcome === "Pass") {
+          return y(noToPass)
+        }
+
+        else if (d.outcome === "Block") {
+          return y(noToBlock)
+        }
+
+      })
+      .attr("dy", function(d) {
+                if (getW < 460) {
+                  return x.rangeBand()*-0.35;
+                }  
+                
+                else {
+                  return "0.35em"
+                }
+                })
+      .attr("dx",function(d) {
+                if (getW < 460) {
+                  return "0.1em";
+                }  
+                
+                else {
+                  return "-1.5em"
+                }
+                })
+      .attr("transform", function(d) {
+                if (getW < 460) {
+
+                  if (d.outcome === "Pass") {
+                    return "rotate(-90,0," + y(noToPass) + ")"
+                  }
+
+                  else if (d.outcome === "Block") {
+                    return "rotate(-90,0," + y(noToBlock) + ")"
+                  }
+
+                }  
+                
+                else {
+                  return ""
+                }
+                })
+      .style("text-anchor", "end")
+      .text(function(d) { return d.outcome });
+   
+  toPass
+     .append("rect")
+      .data(notes)
+      .attr("y", function(d) { 
+
+        if (d.outcome === "Pass") {
+          return y(noToPass)
+        }
+
+        else if (d.outcome === "Block") {
+          return y(noToBlock)
+        }
+
+        })
+      .attr("x", (x.rangeBand() - (x.rangeBand()*1.15))/2)
+      .attr("width", x.rangeBand()*1.15)
+      .attr("height", 1);     
+
+//Clear old table
+
+$("#voteTable").html("");
+
+//Update table
+
+$("#voteTable").append(
+      "<tr>" +
+      "<th class='large partyCol'>Party</th>" +
+      "<th class='large forCol'>For</th>" +
+      "<th class='large againstCol'>Against</th>" +
+      "<th class='large absentCol'>Absent</th>" +
+      "</tr>"
+);
+
+//Make a nice table
+
+data[0]['parties'].forEach(function(d) {
+
+$("#voteTable").append(
+  "<tr>" +
+  "<td class='partyCol'><span class='" + d.name.replace(" ","_") + "'>" + d.name + "</span></td>" +
+  "<td class='forCol'>" + data[0][d.name] + "</td>" + 
+  "<td class='againstCol'>" + data[1][d.name] + "</td>" + 
+  "<td class='absentCol'>" + data[2][d.name] + "</td>" + 
+  "</tr>"
+  );
+
+});
+
+d3.selectAll(".partyCol")
+  .attr("width", x.rangeBand()*.85); 
+
+d3.selectAll(".forCol")
+  .attr("width", x.rangeBand())
+  .style("padding-right", function() { return (x.rangeBand()/3) + "px"}); 
+
+d3.selectAll(".againstCol")
+  .attr("width", x.rangeBand())
+  .style("padding-right", function() { return (x.rangeBand()/3) + "px"})
+  .style("padding-left", function() { return (x.rangeBand()/3) + "px"});
+
+d3.selectAll(".absentCol")
+  .attr("width", x.rangeBand())
+  .style("padding-right", function() { return (x.rangeBand()/3) + "px"})
+  .style("padding-left", function() { return (x.rangeBand()/3) + "px"});
+
+});
+
+}
+
+//DRAW IT DRAW IT NOW
+
+drawGraph();
+iframeMessenger.enableAutoResize();
+
+//Responsive jazz
+
+//Exclude iOS devices from window.onresize because of weird bug within iframes, see: https://bugs.webkit.org/show_bug.cgi?id=133477
+
+if( !/iPhone|iPad|iPod/i.test(navigator.userAgent) ) {
+
+$(window).resize(function() {
+
+getW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+
+if (getW < 460) {
+
+  getH = 200;
+
+}
+
+else {
+
+  getH = 300;
+}
+
+margin = {top: 5, right: 20, bottom: 10, left:25},
+    width = getW - margin.left - margin.right,
+    height = getH - margin.top - margin.bottom;
+
+x.rangeRoundBands([0, width], .4);
+
+y.rangeRound([height, 0]);
+   
+drawGraph();
+
+});
+
+
+}
+
+
+
+</script>
+</body>
+</html>
